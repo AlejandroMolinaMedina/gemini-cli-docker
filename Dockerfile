@@ -5,7 +5,8 @@ RUN apk add --no-cache \
     git \
     bash \
     jq \
-    curl
+    curl \
+    github-cli
 
 # Instalar el SDK/CLI globalmente
 RUN npm install -g @google/genai
