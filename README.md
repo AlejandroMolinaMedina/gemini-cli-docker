@@ -1,59 +1,72 @@
-# Proyecto de Automatización y Contenedorización
+# Gemini CLI Docker Environment
 
-Este repositorio contiene la configuración base necesaria para el despliegue y la orquestación de servicios mediante Docker. El proyecto está diseñado para facilitar un entorno de desarrollo consistente y una puesta en producción simplificada.
+Este repositorio contiene la definición del contenedor Docker utilizado como entorno de ejecución (runner) para la GitHub Action Alexmm14/toolsActions/gemini-readme.
 
-## Características Principales
+La imagen empaqueta la CLI de GitHub (gh) y las utilidades del sistema necesarias para analizar repositorios, extraer metadatos contextuales y permitir a la acción de Gemini crear ramas y Pull Requests automáticamente.
 
-- **Docker-Ready**: Configuración completa mediante `Dockerfile` para garantizar entornos reproducibles.
-- **Estructura Modular**: Organización lógica de los archivos del proyecto para facilitar el mantenimiento.
-- **Escalabilidad**: Diseñado para integrarse en pipelines de CI/CD modernos.
+## Contenido y Herramientas Incluidas
 
-## Guía de Inicio Rápido
+| Herramienta / Componente | Descripción y Uso |
+| :--- | :--- |
+| gh (GitHub CLI) | Requerido. Utilizado por la acción para autenticarse, crear ramas y abrir automáticamente el Pull Request con los cambios de la documentación. |
+| git / curl / jq | Herramientas de soporte para la extracción del árbol de directorios, historial de cambios y descarga del prompt remoto. |
+| Base Image | Entorno optimizado para ejecutarse dentro de la directiva container: de GitHub Actions. |
 
-### Requisitos Previos
-- Docker instalado y configurado en el sistema (versión 20.10+ recomendada).
+## Estructura del Repositorio
 
-### Instalación
-1. Clona el repositorio en tu máquina local:
-   ```bash
-   git clone <url-del-repositorio>
-   cd <nombre-del-proyecto>
-   ```
-
-2. Construye la imagen del contenedor:
-   ```bash
-   docker build -t nombre-de-la-imagen .
-   ```
-
-3. Ejecuta el contenedor:
-   ```bash
-   docker run -d --name nombre-del-contenedor nombre-de-la-imagen
-   ```
-
-## Estructura del Proyecto
-
-```text
 .
-├── Dockerfile          # Definición de la imagen del contenedor
-├── changes.txt         # Registro de cambios y actualizaciones recientes
-└── structure.txt       # Documentación de la jerarquía del árbol de directorios
-```
+├── Dockerfile          # Definición de la imagen del contenedor con gh y herramientas
+├── changes.txt         # Artefacto auxiliar con el historial de commits recientes (usado por Gemini)
+└── structure.txt       # Artefacto auxiliar con la jerarquía del árbol del proyecto (usado por Gemini)
 
-## Soporte y Documentación
+## Uso en GitHub Actions
 
-Para soporte técnico, reporte de errores o sugerencias de mejora, por favor utiliza las siguientes vías:
+Esta imagen se publica en GitHub Container Registry (GHCR) y está diseñada para usarse como contenedor base en tus workflows de CI/CD:
 
-- **Issues**: Reporta cualquier incidencia a través de la sección de [Issues](https://github.com/usuario/repositorio/issues).
-- **Consultas**: Revisa los archivos de documentación local (`structure.txt` y `changes.txt`) para obtener detalles técnicos adicionales sobre los componentes.
+```yaml
+name: Auto Update README
 
-## Mantenimiento y Contribución
+on:
+  push:
+    branches: [ main, master ]
 
-Este proyecto es de código abierto. Si deseas contribuir:
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/alejandromolinamedina/gemini-cli-docker:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-1. Realiza un Fork del repositorio.
-2. Crea una rama para tu característica o corrección (`git checkout -b feature/nueva-funcionalidad`).
-3. Envía un Pull Request detallando los cambios realizados.
+      - name: Auto Update README via Gemini
+        uses: Alexmm14/toolsActions/gemini-readme@master
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_model: 'gemini-1.5-flash'
+          prompt_url: '[https://raw.githubusercontent.com/usuario/repo/main/prompts/readme-updater.md](https://raw.githubusercontent.com/usuario/repo/main/prompts/readme-updater.md)'
+Construcción Local y Pruebas
+Si deseas construir la imagen localmente o probar las herramientas en tu equipo:
 
-Para más detalles sobre las normas de contribución, por favor consulta la documentación interna del repositorio o contacta con el equipo de mantenedores.
+1. Construir la imagen
+docker build -t gemini-cli-docker .
 
-*Nota: Este proyecto se distribuye bajo los términos definidos en el archivo LICENSE.*
+2. Probar que GitHub CLI esté disponible
+docker run --rm -it -e GITHUB_TOKEN="tu_personal_access_token" gemini-cli-docker gh --version
+
+Publicación en GHCR (GitHub Container Registry)
+Para compilar y subir una nueva versión del contenedor a GHCR manualmente:
+
+Autenticarse en GHCR
+echo $CR_PAT | docker login ghcr.io -u alejandromolinamedina --password-stdin
+
+Construir y etiquetar
+docker build -t ghcr.io/alejandromolinamedina/gemini-cli-docker:latest .
+
+Publicar imagen
+docker push ghcr.io/alejandromolinamedina/gemini-cli-docker:latest
