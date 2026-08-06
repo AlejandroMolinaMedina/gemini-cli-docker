@@ -33,3 +33,4 @@ jobs:
           gemini_model: ${{ vars.GEMINI_MODEL }}
           prompt_url: ${{ vars.PROMPT_URL }}
           target_branch: 'master'
+          
